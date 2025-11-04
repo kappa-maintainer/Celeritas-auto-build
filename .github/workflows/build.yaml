@@ -103,15 +103,6 @@ jobs:
         working-directory: ./celeritas
         run: ./gradlew -Ptarget_versions=1.12.2 packageJar
 
-      - name: List everything
-        run: tree
-
-      - name: Remove dev jars
-        working-directory: ./celeritas/forge122/versions/1.12.2/build/libs
-        run: |
-          rm *-dev-dev.jar
-          rm *-dev-remapped-thin.jar
-
       - name: Update hash storage
         run: echo $COMMIT_HASH > ./latest_commit
 
@@ -124,7 +115,7 @@ jobs:
 
       - uses: ncipollo/release-action@v1.14.0
         with:
-          artifacts: 'celeritas/forge122/versions/1.12.2/build/libs/*.jar'
+          artifacts: 'celeritas/build/libs/**/*.jar'
           generateReleaseNotes: false
           bodyFile: "celeritas/body.txt"
           tag: ${{ env.LATEST_DESCRIBE }}-${{ env.CURRENT_DATE }}

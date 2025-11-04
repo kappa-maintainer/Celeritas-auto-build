@@ -103,6 +103,9 @@ jobs:
         working-directory: ./celeritas
         run: ./gradlew -Ptarget_versions=1.12.2 packageJar
 
+      - name: List everything
+        run: tree
+
       - name: Remove dev jars
         working-directory: ./celeritas/forge122/versions/1.12.2/build/libs
         run: |

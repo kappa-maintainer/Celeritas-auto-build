@@ -187,19 +187,17 @@ jobs:
                   version = System.getenv("MAVEN_VERSION")
               }
 
-              forge122.extensions.configure(PublishingExtension) {
-                  publications.named("default", MavenPublication) {
-                      version = System.getenv("MAVEN_VERSION")
-                      artifact(forge122.tasks.named("jar")) {
-                          classifier = "dev"
-                      }
+              def forgePub = forge122.extensions.getByType(PublishingExtension)
+              forgePub.publications.withType(MavenPublication).configureEach {
+                  version = System.getenv("MAVEN_VERSION")
+                  artifact(forge122.tasks.named("jar")) {
+                      classifier = "dev"
                   }
               }
 
-              common.extensions.configure(PublishingExtension) {
-                  publications.named("mavenJava", MavenPublication) {
-                      version = System.getenv("MAVEN_VERSION")
-                  }
+              def commonPub = common.extensions.getByType(PublishingExtension)
+              commonPub.publications.withType(MavenPublication).configureEach {
+                  version = System.getenv("MAVEN_VERSION")
               }
           }
           EOF

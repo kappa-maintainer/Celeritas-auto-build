@@ -161,22 +161,17 @@ jobs:
 
           gradle.allprojects { project ->
               project.plugins.withId("maven-publish") {
-                  project.afterEvaluate {
-                      if (project.rootProject.name != "celeritas") return
+                  if (project.rootProject.name != "celeritas") return
 
-                      project.extensions.configure(PublishingExtension) {
-                          repositories.clear()
-                          repositories.maven {
-                              name = "outlands"
-                              url = uri("https://maven.outlands.top/releases")
-                              credentials {
-                                  username = System.getenv("OUTLANDS_USR")
-                                  password = System.getenv("OUTLANDS_PWD")
-                              }
-                              authentication {
-                                  basic(BasicAuthentication)
-                              }
-                          }
+                  project.publishing.repositories.maven {
+                      name = "outlands"
+                      url = uri("https://maven.outlands.top/releases")
+                      credentials {
+                          username = System.getenv("OUTLANDS_USR")
+                          password = System.getenv("OUTLANDS_PWD")
+                      }
+                      authentication {
+                          basic(BasicAuthentication)
                       }
                   }
               }

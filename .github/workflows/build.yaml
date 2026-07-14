@@ -160,6 +160,8 @@ jobs:
           import org.gradle.api.publish.maven.MavenPublication
 
           gradle.projectsEvaluated {
+              if (rootProject.name != "celeritas") return
+
               def forge122 = rootProject.project(":forge122")
               def common = rootProject.project(":common")
 

@@ -2,6 +2,12 @@ name: Auto Releases
 
 on:
   workflow_dispatch:
+    inputs:
+      upload_artifact:
+        description: Upload build output as an Actions artifact instead of a GitHub Release
+        required: true
+        default: false
+        type: boolean
   schedule:
     - cron: "0 0 * * *"
 
@@ -34,11 +40,11 @@ jobs:
       - name: Check if new commits appear
         id: checker
         run: |
-          if [[ "${{ steps.latest.outputs.commit_hash }}" == "${{ steps.previous.outputs.commit_hash }}" ]]
+          if [[ "${{ inputs.upload_artifact }}" == "true" || "${{ steps.latest.outputs.commit_hash }}" != "${{ steps.previous.outputs.commit_hash }}" ]]
           then
-            echo "should_run=false" >> $GITHUB_OUTPUT
-          else
             echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
           fi
 
 
@@ -99,21 +105,51 @@ jobs:
 
       - name: Build Jars
         working-directory: ./celeritas
-        run: ./gradlew -Pceleritas_target_versions=1.12.2 packageJar
+        run: ./gradlew -Pceleritas_target_versions=1.12.2 packageJar jar sourcesJar
+
+      - name: Collect release Jars
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t production_jars < <(find celeritas -path '*/build/libs/*' -type f -name 'celeritas-forge-mc12.2-*-dev.jar' ! -name '*-dev-dev.jar' | sort)
+          mapfile -t development_jars < <(find celeritas -path '*/build/libs/*' -type f -name 'celeritas-forge-mc12.2-*-dev-dev.jar' | sort)
+          mapfile -t source_jars < <(find celeritas -path '*/build/libs/*' -type f -name 'celeritas-forge-mc12.2-*-sources.jar' | sort)
+
+          test "${#production_jars[@]}" -eq 1
+          test "${#development_jars[@]}" -eq 1
+          test "${#source_jars[@]}" -eq 1
+
+          mkdir artifacts
+          cp "${production_jars[0]}" "artifacts/01-$(basename "${production_jars[0]}")"
+          cp "${development_jars[0]}" "artifacts/02-$(basename "${development_jars[0]}")"
+          cp "${source_jars[0]}" "artifacts/03-$(basename "${source_jars[0]}")"
 
       - name: Update hash storage
+        if: inputs.upload_artifact != true
         run: echo "$COMMIT_HASH" > ./latest_commit
 
       - name: Commit hash update
+        if: inputs.upload_artifact != true
         uses: EndBug/add-and-commit@v10
         with:
           add: 'latest_commit'
           push: true
           tag: ${{ env.RELEASE_TAG }}
 
-      - uses: ncipollo/release-action@v1.21.0
+      - name: Upload build artifact
+        if: inputs.upload_artifact == true
+        uses: actions/upload-artifact@v4
         with:
-          artifacts: 'celeritas/build/libs/**/*.jar'
+          name: celeritas-${{ env.RELEASE_TAG }}
+          path: artifacts/
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: inputs.upload_artifact != true
+        uses: ncipollo/release-action@v1.21.0
+        with:
+          artifacts: 'artifacts/*.jar'
           generateReleaseNotes: false
           bodyFile: "celeritas/body.txt"
           tag: ${{ env.RELEASE_TAG }}

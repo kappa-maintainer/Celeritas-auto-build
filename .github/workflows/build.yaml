@@ -105,22 +105,35 @@ jobs:
 
       - name: Build Jars
         working-directory: ./celeritas
-        run: ./gradlew -Pceleritas_target_versions=1.12.2 packageJar jar sourcesJar
+        run: |
+          ./gradlew -Pceleritas_target_versions=1.12.2 \
+            :forge122:packageJar \
+            :forge122:jar \
+            :forge122:sourcesJar
 
       - name: Collect release Jars
         shell: bash
         run: |
           set -euo pipefail
 
-          mapfile -t production_jars < <(find celeritas -path '*/build/libs/*' -type f -name 'celeritas-forge-mc12.2-*-dev.jar' ! -name '*-dev-dev.jar' | sort)
-          mapfile -t development_jars < <(find celeritas -path '*/build/libs/*' -type f -name 'celeritas-forge-mc12.2-*-dev-dev.jar' | sort)
-          mapfile -t source_jars < <(find celeritas -path '*/build/libs/*' -type f -name 'celeritas-forge-mc12.2-*-sources.jar' | sort)
+          echo "Production output:"
+          find celeritas/build/libs -type f -name '*.jar' -print | sort
+          echo "Forge 1.12.2 output:"
+          find celeritas/forge122/build/libs -type f -name '*.jar' -print | sort
+
+          mapfile -t production_jars < <(find celeritas/build/libs -type f -name 'celeritas-forge-mc12.2-*-dev.jar' ! -name '*-dev-dev.jar' | sort)
+          mapfile -t development_jars < <(find celeritas/forge122/build/libs -type f -name 'celeritas-forge-mc12.2-*-dev-dev.jar' | sort)
+          mapfile -t source_jars < <(find celeritas/forge122/build/libs -type f -name 'celeritas-forge-mc12.2-*-sources.jar' | sort)
+
+          printf 'Runnable JARs:\n%s\n' "${production_jars[@]:-<none>}"
+          printf 'Development JARs:\n%s\n' "${development_jars[@]:-<none>}"
+          printf 'Source JARs:\n%s\n' "${source_jars[@]:-<none>}"
 
           test "${#production_jars[@]}" -eq 1
           test "${#development_jars[@]}" -eq 1
           test "${#source_jars[@]}" -eq 1
 
-          mkdir artifacts
+          mkdir -p artifacts
           cp "${production_jars[0]}" "artifacts/01-$(basename "${production_jars[0]}")"
           cp "${development_jars[0]}" "artifacts/02-$(basename "${development_jars[0]}")"
           cp "${source_jars[0]}" "artifacts/03-$(basename "${source_jars[0]}")"

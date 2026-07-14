@@ -159,6 +159,29 @@ jobs:
           import org.gradle.api.publish.PublishingExtension
           import org.gradle.api.publish.maven.MavenPublication
 
+          gradle.allprojects { project ->
+              project.plugins.withId("maven-publish") {
+                  project.afterEvaluate {
+                      if (project.rootProject.name != "celeritas") return
+
+                      project.extensions.configure(PublishingExtension) {
+                          repositories.clear()
+                          repositories.maven {
+                              name = "outlands"
+                              url = uri("https://maven.outlands.top/releases")
+                              credentials {
+                                  username = System.getenv("OUTLANDS_USR")
+                                  password = System.getenv("OUTLANDS_PWD")
+                              }
+                              authentication {
+                                  basic(BasicAuthentication)
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+
           gradle.projectsEvaluated {
               if (rootProject.name != "celeritas") return
 
@@ -167,23 +190,6 @@ jobs:
 
               allprojects {
                   version = System.getenv("MAVEN_VERSION")
-              }
-
-              [forge122, common].each { targetProject ->
-                  targetProject.extensions.configure(PublishingExtension) {
-                      repositories.clear()
-                      repositories.maven {
-                          name = "outlands"
-                          url = uri("https://maven.outlands.top/releases")
-                          credentials {
-                              username = System.getenv("OUTLANDS_USR")
-                              password = System.getenv("OUTLANDS_PWD")
-                          }
-                          authentication {
-                              basic(BasicAuthentication)
-                          }
-                      }
-                  }
               }
 
               forge122.extensions.configure(PublishingExtension) {

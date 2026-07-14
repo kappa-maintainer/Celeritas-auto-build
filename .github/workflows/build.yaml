@@ -77,6 +77,12 @@ jobs:
       - name: Set commit hash
         run: echo "COMMIT_HASH=${{ needs.check.outputs.commit_hash }}" >> "$GITHUB_ENV"
 
+      - name: Set Maven version
+        run: |
+          base_version=$(grep '^project_base_version=' ./celeritas/gradle.properties | cut -d= -f2)
+          test -n "$base_version"
+          echo "MAVEN_VERSION=${base_version}.0-autobuild.${COMMIT_HASH:0:8}" >> "$GITHUB_ENV"
+
       - name: Get current date
         run: echo "CURRENT_DATE=$(date +'%Y%m%dT%H%M%S')" >> "$GITHUB_ENV"
 
@@ -137,6 +143,69 @@ jobs:
           cp "${production_jars[0]}" "artifacts/01-$(basename "${production_jars[0]}")"
           cp "${development_jars[0]}" "artifacts/02-$(basename "${development_jars[0]}")"
           cp "${source_jars[0]}" "artifacts/03-$(basename "${source_jars[0]}")"
+
+      - name: Publish Maven artifacts
+        env:
+          OUTLANDS_USR: ${{ secrets.OUTLANDS_USR }}
+          OUTLANDS_PWD: ${{ secrets.OUTLANDS_PWD }}
+        working-directory: ./celeritas
+        run: |
+          set -euo pipefail
+          test -n "$OUTLANDS_USR"
+          test -n "$OUTLANDS_PWD"
+
+          cat > "$RUNNER_TEMP/publish-to-outlands.gradle" <<'EOF'
+          import org.gradle.authentication.http.BasicAuthentication
+          import org.gradle.api.publish.PublishingExtension
+          import org.gradle.api.publish.maven.MavenPublication
+
+          gradle.projectsEvaluated {
+              def forge122 = rootProject.project(":forge122")
+              def common = rootProject.project(":common")
+
+              allprojects {
+                  version = System.getenv("MAVEN_VERSION")
+              }
+
+              [forge122, common].each { targetProject ->
+                  targetProject.extensions.configure(PublishingExtension) {
+                      repositories.clear()
+                      repositories.maven {
+                          name = "outlands"
+                          url = uri("https://maven.outlands.top/releases")
+                          credentials {
+                              username = System.getenv("OUTLANDS_USR")
+                              password = System.getenv("OUTLANDS_PWD")
+                          }
+                          authentication {
+                              basic(BasicAuthentication)
+                          }
+                      }
+                  }
+              }
+
+              forge122.extensions.configure(PublishingExtension) {
+                  publications.named("default", MavenPublication) {
+                      version = System.getenv("MAVEN_VERSION")
+                      artifact(forge122.tasks.named("jar")) {
+                          classifier = "dev"
+                      }
+                  }
+              }
+
+              common.extensions.configure(PublishingExtension) {
+                  publications.named("mavenJava", MavenPublication) {
+                      version = System.getenv("MAVEN_VERSION")
+                  }
+              }
+          }
+          EOF
+
+          ./gradlew \
+            -Pceleritas_target_versions=1.12.2 \
+            --init-script "$RUNNER_TEMP/publish-to-outlands.gradle" \
+            :forge122:publishDefaultPublicationToOutlandsRepository \
+            :common:publishMavenJavaPublicationToOutlandsRepository
 
       - name: Update hash storage
         if: inputs.upload_artifact != true
